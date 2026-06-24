@@ -8,7 +8,9 @@ license = "MIT"
 authors = [
     { name = "Dong Realm", email = "dongrealm@163.com" }
 ]
-dependencies = []
+dependencies = [
+    "pydantic-settings>=2.14.2",
+]
 
 [project.optional-dependencies]
 dev = [
