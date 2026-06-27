@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Agent
     workspace_dir: str = Field(
         default=".",
-        description="Root directory for Deep Agents filesystem backend (Code Self-Inspection)",
+        description="Agent workspace root for Deep Agents filesystem backend (notes and personal files)",
     )
 
     # Gateway

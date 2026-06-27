@@ -9,15 +9,16 @@ from zero_agent.settings import settings
 def main() -> None:
     configure_logging(level=settings.log_level, json=settings.log_json)
 
-    print(" ┌────────────────────────────────────────┐")
-    print(f" │          Zero Agent v{__version__}             │")
-    print(" │     Code Self-Inspection Service       │")
-    print(" └────────────────────────────────────────┘")
+    width = 40
+    print(" ┌" + "─" * width + "┐")
+    print(f" │{'Zero · Personal Assistant':^{width}}│")
+    print(f" │{f'v{__version__}':^{width}}│")
+    print(" └" + "─" * width + "┘")
     print()
     print(f"  Model: {settings.openai_model}")
     print(f"  Data: {settings.data_dir}")
 
-    print("  Zero Agent ready. Press Ctrl+C to stop.")
+    print("  Ready. Press Ctrl+C to stop.")
     print()
 
     success = asyncio.run(run_application())
