@@ -5,7 +5,13 @@ from typing import Any
 from aibot import WSClient, WSClientOptions
 from pydantic import SecretStr
 
-from zero_agent.gateway.protocol import BaseAdapter, MessageEvent, MessageType
+from zero_agent.gateway.outbound import (
+    AdapterCapabilities,
+    ApprovalRequest,
+    OutboundChannel,
+    UnsupportedOutboundError,
+)
+from zero_agent.gateway.protocol import BaseAdapter, MessageEvent, MessageType, PushTarget
 from zero_agent.observability.setup import get_logger
 from zero_agent.session.models import SessionKey
 
@@ -13,7 +19,7 @@ logger = get_logger(__name__)
 
 
 def parse_wecom_session_id(frame: dict[str, Any]) -> str:
-    """Build interim session_id from WeCom callback frame."""
+    """Build session_id from WeCom callback frame."""
     return wecom_session_key_from_frame(frame).to_id()
 
 
@@ -24,6 +30,36 @@ def wecom_session_key_from_frame(frame: dict[str, Any]) -> SessionKey:
     return SessionKey(platform="wecom", chat_id=chat_id, user_id=user_id or None)
 
 
+def parse_wecom_push_target(frame: dict[str, Any]) -> PushTarget:
+    """Extract proactive push target from a WeCom callback frame."""
+    body = frame.get("body") or {}
+    chat_id = _first_str(body, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
+    chat_type = _first_int(body, "chattype", "chat_type")
+    if chat_type is None:
+        chat_type = _first_int(frame, "chattype", "chat_type")
+    return PushTarget(chat_id=chat_id, chat_type=chat_type)
+
+
+def message_event_from_frame(frame: dict[str, Any]) -> MessageEvent:
+    """Normalize a WeCom text callback frame into MessageEvent."""
+    body = frame.get("body") or {}
+    text = body.get("text", {})
+    content = text.get("content", "") if isinstance(text, dict) else ""
+    if not isinstance(content, str):
+        content = str(content)
+
+    key = wecom_session_key_from_frame(frame)
+    return MessageEvent(
+        platform="wecom",
+        session_id=key.to_id(),
+        content=content,
+        msg_type=MessageType.TEXT,
+        push_target=parse_wecom_push_target(frame),
+        reply_to=frame,
+        extra=frame,
+    )
+
+
 def _first_str(data: dict[str, Any], *keys: str) -> str:
     for key in keys:
         value = data.get(key)
@@ -32,7 +68,19 @@ def _first_str(data: dict[str, Any], *keys: str) -> str:
     return ""
 
 
-class WecomAdapter(BaseAdapter):
+def _first_int(data: dict[str, Any], *keys: str) -> int | None:
+    for key in keys:
+        value = data.get(key)
+        if isinstance(value, int):
+            return value
+        if isinstance(value, str) and value.isdigit():
+            return int(value)
+    return None
+
+
+class WecomAdapter(BaseAdapter, OutboundChannel):
+    capabilities = AdapterCapabilities(reply=True)
+
     def __init__(self, bot_id: str, secret: SecretStr) -> None:
         super().__init__(name="wecom")
         options = WSClientOptions(
@@ -57,24 +105,44 @@ class WecomAdapter(BaseAdapter):
         logger.info("adapter.authenticated", platform=self.name)
 
     async def _on_text(self, frame: dict[str, Any]) -> None:
-        body = frame.get("body", {})
-        content = body.get("text", {}).get("content", "")
-        session_id = parse_wecom_session_id(frame)
+        event = message_event_from_frame(frame)
         logger.info(
             "message.received",
             platform=self.name,
-            session_id=session_id,
-            content_len=len(content),
-        )
-        event = MessageEvent(
-            platform=self.name,
-            session_id=session_id,
-            content=content,
-            msg_type=MessageType.TEXT,
-            extra=frame,
+            session_id=event.session_id,
+            content_len=len(event.content),
         )
         await self.handle_message(event)
 
+    async def reply(self, event: MessageEvent, content: str) -> None:
+        frame = event.reply_to or event.extra or {}
+        await self._client.reply(
+            frame,
+            {"msgtype": "markdown", "markdown": {"content": content}},
+        )
+
+    async def reply_stream(
+        self,
+        event: MessageEvent,
+        stream_id: str,
+        content: str,
+        *,
+        finish: bool = False,
+    ) -> None:
+        del event, stream_id, content, finish
+        raise UnsupportedOutboundError("WeCom reply_stream not implemented yet")
+
+    async def push(self, target: PushTarget, content: str) -> None:
+        del target, content
+        raise UnsupportedOutboundError("WeCom push not implemented yet")
+
+    async def request_approval(self, event: MessageEvent, req: ApprovalRequest) -> None:
+        del event, req
+        raise UnsupportedOutboundError("WeCom approval_card not implemented yet")
+
+    async def update_approval(self, event: MessageEvent, req: ApprovalRequest) -> None:
+        del event, req
+        raise UnsupportedOutboundError("WeCom approval_card_update not implemented yet")
+
     async def _send_reply(self, event: MessageEvent, reply: str) -> None:
-        frame = event.extra or {}
-        await self._client.reply(frame, {"msgtype": "markdown", "markdown": {"content": reply}})
+        await self.reply(event, reply)
