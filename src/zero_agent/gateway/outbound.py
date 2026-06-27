@@ -1,4 +1,4 @@
-"""Gateway outbound reply protocol (extended in Phase E)."""
+"""Gateway outbound reply protocol"""
 
 from __future__ import annotations
 

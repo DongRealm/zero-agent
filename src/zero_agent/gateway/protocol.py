@@ -65,7 +65,7 @@ class BaseAdapter(ABC):
         """Set the message handler.
 
         Target signature: ``async def handler(event: MessageEvent) -> None``
-        Replies should be sent via ``OutboundChannel.reply`` (Phase F).
+        Replies should be sent via ``OutboundChannel.reply``.
 
         Transitional: handlers may still return ``str | None``; non-empty values
         are sent via ``_send_reply`` until Phase F step 23.
