@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
+from zero_agent.agent import AgentService
 from zero_agent.command import CommandRouter, LangCommand, ResetCommand
 from zero_agent.gateway.platforms.wecom import WecomAdapter
 from zero_agent.gateway.runner import GateRunner
@@ -39,7 +40,12 @@ class ApplicationRunner:
                 LangCommand(self._registry),
             ]
         )
-        self._dispatcher = MessageDispatcher(self._registry, self._commands)
+        self._agent = AgentService.from_settings(settings)
+        self._dispatcher = MessageDispatcher(
+            self._registry,
+            self._commands,
+            self._agent,
+        )
         self._runner = GateRunner(self._dispatcher)
         self._cron = CronRunner(
             interval=60,

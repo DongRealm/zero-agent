@@ -56,7 +56,7 @@ class MessageEvent:
     """Extended fields, e.g. @ mentions, reply context, etc."""
 
 
-MessageHandler = Callable[[MessageEvent], Awaitable[str | None]]
+MessageHandler = Callable[[MessageEvent], Awaitable[None]]
 
 logger = get_logger(__name__)
 
@@ -83,11 +83,8 @@ class BaseAdapter(ABC):
     def set_message_handler(self, handler: MessageHandler | Any) -> None:
         """Set the message handler.
 
-        Target signature: ``async def handler(event: MessageEvent) -> None``
-        Replies should be sent via ``OutboundChannel.reply``.
-
-        Transitional: handlers may still return ``str | None``; non-empty values
-        are sent via ``_send_reply`` until Phase F step 23.
+        Signature: ``async def handler(event: MessageEvent) -> None``
+        Replies must be sent via ``OutboundChannel.reply`` inside the handler chain.
         """
         self._message_handler = handler
 
@@ -111,15 +108,11 @@ class BaseAdapter(ABC):
     async def _process_session(self, event: MessageEvent, session_key: str) -> None:
         """Process the current message, then consume queued messages in order."""
         try:
-            reply = await self._dispatch(event)
-            if reply:
-                await self._send_reply(event, reply)
+            await self._dispatch(event)
 
             while session_key in self._pending_messages and self._pending_messages[session_key]:
                 next_event = self._pending_messages[session_key].pop(0)
-                reply = await self._dispatch(next_event)
-                if reply:
-                    await self._send_reply(next_event, reply)
+                await self._dispatch(next_event)
         finally:
             self._active_sessions.pop(session_key, None)
             self._pending_messages.pop(session_key, None)
@@ -136,9 +129,7 @@ class BaseAdapter(ABC):
             content_len=len(reply),
         )
 
-    async def _dispatch(self, event: MessageEvent) -> str | None:
+    async def _dispatch(self, event: MessageEvent) -> None:
         """Dispatch the message event to the handler."""
         if self._message_handler:
-            result: str | None = await self._message_handler(event)
-            return result
-        return None
+            await self._message_handler(event)

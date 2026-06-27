@@ -79,9 +79,9 @@ class GateRunner:
     async def await_for_shutdown(self) -> None:
         await self._shutdown_event.wait()
 
-    async def handle_message(self, event: MessageEvent) -> str | None:
+    async def handle_message(self, event: MessageEvent) -> None:
         outbound = self._outbound_for(event)
-        return await self._dispatcher.handle(event, outbound)
+        await self._dispatcher.handle(event, outbound)
 
     def _outbound_for(self, event: MessageEvent) -> OutboundChannel | None:
         adapter = self.adapters.get(event.platform)

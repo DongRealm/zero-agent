@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
+from zero_agent.agent.types import AgentError, AgentResult
 from zero_agent.command import CommandRouter, LangCommand, ResetCommand
 from zero_agent.gateway.protocol import MessageEvent, PushTarget
 from zero_agent.runner.dispatcher import MessageDispatcher
@@ -25,14 +26,21 @@ def session_key() -> SessionKey:
 
 
 @pytest.fixture
-def dispatcher(registry: SessionRegistry) -> MessageDispatcher:
+def agent() -> AsyncMock:
+    mock = AsyncMock()
+    mock.invoke = AsyncMock(return_value=AgentResult(content="agent-reply", thread_id="thread-1"))
+    return mock
+
+
+@pytest.fixture
+def dispatcher(registry: SessionRegistry, agent: AsyncMock) -> MessageDispatcher:
     commands = CommandRouter(
         [
             ResetCommand(registry),
             LangCommand(registry),
         ]
     )
-    return MessageDispatcher(registry, commands)
+    return MessageDispatcher(registry, commands, agent)
 
 
 @pytest.mark.asyncio
@@ -50,9 +58,8 @@ async def test_dispatcher_reset_replies_via_outbound(
         reply_to={"body": {"chatid": "chat1"}},
     )
 
-    result = await dispatcher.handle(event, outbound)
+    await dispatcher.handle(event, outbound)
 
-    assert result is None
     outbound.reply.assert_awaited_once_with(event, "已开启新对话，上下文已清空。")
 
 
@@ -78,32 +85,68 @@ async def test_dispatcher_lang_replies_via_outbound(
 
 
 @pytest.mark.asyncio
-async def test_dispatcher_non_command_echoes(
+async def test_dispatcher_agent_invoke_replies_via_outbound(
     dispatcher: MessageDispatcher,
+    agent: AsyncMock,
     session_key: SessionKey,
+    registry: SessionRegistry,
 ) -> None:
+    outbound = AsyncMock()
+    outbound.reply = AsyncMock()
     event = MessageEvent(
         platform="wecom",
         content="hello",
         session_id=session_key.to_id(),
     )
 
-    result = await dispatcher.handle(event, AsyncMock())
+    await dispatcher.handle(event, outbound)
 
-    assert result == "已收到消息: hello"
+    thread_id = await registry.resolve_thread_id(session_key)
+    agent.invoke.assert_awaited_once_with(thread_id, "hello")
+    outbound.reply.assert_awaited_once_with(event, "agent-reply")
 
 
 @pytest.mark.asyncio
-async def test_dispatcher_command_without_outbound_returns_text(
+async def test_dispatcher_agent_error_replies_with_i18n(
     dispatcher: MessageDispatcher,
+    agent: AsyncMock,
     session_key: SessionKey,
 ) -> None:
+    agent.invoke.side_effect = AgentError("boom", thread_id="thread-1")
+    outbound = AsyncMock()
+    outbound.reply = AsyncMock()
     event = MessageEvent(
         platform="wecom",
-        content="/new",
+        content="hello",
         session_id=session_key.to_id(),
     )
 
-    result = await dispatcher.handle(event, None)
+    await dispatcher.handle(event, outbound)
 
-    assert result == "已开启新对话，上下文已清空。"
+    outbound.reply.assert_awaited_once()
+    assert outbound.reply.await_args.args[1] == "处理失败，请稍后重试或发送 /reset 重新开始。"
+
+
+@pytest.mark.asyncio
+async def test_dispatcher_agent_error_uses_session_locale(
+    dispatcher: MessageDispatcher,
+    agent: AsyncMock,
+    session_key: SessionKey,
+    registry: SessionRegistry,
+) -> None:
+    await registry.set_locale(session_key, "en")
+    agent.invoke.side_effect = AgentError("boom", thread_id="thread-1")
+    outbound = AsyncMock()
+    outbound.reply = AsyncMock()
+    event = MessageEvent(
+        platform="wecom",
+        content="hello",
+        session_id=session_key.to_id(),
+    )
+
+    await dispatcher.handle(event, outbound)
+
+    assert (
+        outbound.reply.await_args.args[1]
+        == "Something went wrong. Please retry or send /reset to start over."
+    )
