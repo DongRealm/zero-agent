@@ -29,6 +29,9 @@ class MessageEvent:
     content: str
     """Message content (text content for text messages)."""
 
+    session_id: str = ""
+    """Per-user/chat session key for queuing; filled by adapter from platform frame."""
+
     msg_type: MessageType = MessageType.TEXT
     """Message type."""
 
@@ -75,7 +78,7 @@ class BaseAdapter(ABC):
         Only one message per session is processed at a time; subsequent messages
         are queued and processed sequentially.
         """
-        session_key = f"{event.platform}"
+        session_key = event.session_id or event.platform
 
         if session_key in self._active_sessions:
             if session_key not in self._pending_messages:

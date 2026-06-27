@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import asyncio
 
+from zero_agent.gateway.platforms.wecom import WecomAdapter
 from zero_agent.gateway.runner import GateRunner
-from zero_agent.gateway.wecom_adapter import WecomAdapter
 from zero_agent.runner.lifecycle import (
     CronRunner,
     acquire_pid_file,
