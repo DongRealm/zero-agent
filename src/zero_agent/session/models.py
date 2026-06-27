@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from zero_agent.gateway.protocol import MessageEvent
+if TYPE_CHECKING:
+    from zero_agent.gateway.protocol import MessageEvent
 
 
 @dataclass(frozen=True)

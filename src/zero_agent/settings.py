@@ -27,6 +27,10 @@ class Settings(BaseSettings):
         default=None,
         description="Path to session registry database; defaults to {data_dir}/session.db",
     )
+    checkpoint_db_path: str | None = Field(
+        default=None,
+        description="Path to LangGraph checkpoint database; defaults to {data_dir}/checkpoints.db",
+    )
     default_locale: str = Field(default="zh", description="Default locale for new sessions")
 
     @property
@@ -34,6 +38,12 @@ class Settings(BaseSettings):
         if self.session_db_path:
             return self.session_db_path
         return f"{self.data_dir}/session.db"
+
+    @property
+    def resolved_checkpoint_db_path(self) -> str:
+        if self.checkpoint_db_path:
+            return self.checkpoint_db_path
+        return f"{self.data_dir}/checkpoints.db"
 
     @property
     def db_path(self) -> str:
