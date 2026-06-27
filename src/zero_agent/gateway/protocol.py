@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import StrEnum
 from typing import Any
 
@@ -21,6 +21,15 @@ class MessageType(StrEnum):
     UNKNOWN = "unknown"
 
 
+@dataclass(frozen=True)
+class PushTarget:
+    """Destination for proactive outbound pushes (e.g. WeCom send_message)."""
+
+    chat_id: str
+    chat_type: int | None = None
+    """WeCom: 1 = direct chat, 2 = group chat."""
+
+
 @dataclass
 class MessageEvent:
     """Unified message event abstraction."""
@@ -32,10 +41,16 @@ class MessageEvent:
     """Message content (text content for text messages)."""
 
     session_id: str = ""
-    """Per-user/chat session key for queuing; filled by adapter from platform frame."""
+    """Per-user/chat session key for queuing; must equal SessionKey.to_id()."""
 
     msg_type: MessageType = MessageType.TEXT
     """Message type."""
+
+    push_target: PushTarget = field(default_factory=lambda: PushTarget(chat_id=""))
+    """Target for proactive push notifications."""
+
+    reply_to: dict[str, Any] = field(default_factory=dict)
+    """Platform frame/context required for in-callback reply or reply_stream."""
 
     extra: dict[str, Any] | None = None
     """Extended fields, e.g. @ mentions, reply context, etc."""
