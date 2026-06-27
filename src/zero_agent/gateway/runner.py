@@ -5,6 +5,7 @@ from typing import Any
 
 from zero_agent.gateway.base_adapter import BaseAdapter, MessageEvent
 from zero_agent.gateway.wecom_adapter import WecomAdapter
+from zero_agent.runner.dispatcher import MessageDispatcher
 from zero_agent.runner.lifecycle import (
     CronRunner,
     acquire_pid_file,
@@ -24,6 +25,7 @@ class GateRunner:
         self._running_agents: dict[str, asyncio.Task[None]] = {}
         self._failed_platforms: dict[str, dict[str, Any]] = {}
         self._background_tasks: set[asyncio.Task[None]] = set()
+        self._dispatcher = MessageDispatcher()
 
     async def start(self) -> bool:
         for name, adapter in self.adapters.items():
@@ -80,8 +82,7 @@ class GateRunner:
         await self._shutdown_event.wait()
 
     async def handle_message(self, event: MessageEvent) -> str | None:
-        await asyncio.sleep(1.0)
-        return f"已收到消息: {event.content}"
+        return await self._dispatcher.handle(event)
 
     def _start_background_task(self, coro: Coroutine[Any, Any, None]) -> None:
         task = asyncio.create_task(coro)
@@ -114,7 +115,7 @@ class GateRunner:
 
                 try:
                     success = await adapter.connect()
-                    if success is not False:
+                    if success:
                         print(f"{name} 重连成功")
                         del self._failed_platforms[name]
                     else:
