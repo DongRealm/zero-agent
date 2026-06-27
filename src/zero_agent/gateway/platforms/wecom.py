@@ -79,7 +79,7 @@ def _first_int(data: dict[str, Any], *keys: str) -> int | None:
 
 
 class WecomAdapter(BaseAdapter, OutboundChannel):
-    capabilities = AdapterCapabilities(reply=True)
+    capabilities = AdapterCapabilities(reply=True, reply_stream=True)
 
     def __init__(self, bot_id: str, secret: SecretStr) -> None:
         super().__init__(name="wecom")
@@ -129,8 +129,8 @@ class WecomAdapter(BaseAdapter, OutboundChannel):
         *,
         finish: bool = False,
     ) -> None:
-        del event, stream_id, content, finish
-        raise UnsupportedOutboundError("WeCom reply_stream not implemented yet")
+        frame = event.reply_to or event.extra or {}
+        await self._client.reply_stream(frame, stream_id, content, finish)
 
     async def push(self, target: PushTarget, content: str) -> None:
         del target, content

@@ -30,7 +30,7 @@ def test_approval_request_fields() -> None:
 
 def test_wecom_adapter_capabilities() -> None:
     adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
-    assert adapter.capabilities == AdapterCapabilities(reply=True)
+    assert adapter.capabilities == AdapterCapabilities(reply=True, reply_stream=True)
 
 
 @pytest.mark.asyncio
@@ -51,12 +51,41 @@ async def test_wecom_reply_uses_reply_to() -> None:
 
 
 @pytest.mark.asyncio
-async def test_wecom_reply_stream_not_implemented() -> None:
+async def test_wecom_reply_stream_uses_reply_to() -> None:
     adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
-    event = message_event_from_frame({"body": {"chatid": "c1", "text": {"content": "x"}}})
+    adapter._client = AsyncMock()
+    adapter._client.reply_stream = AsyncMock()
 
-    with pytest.raises(UnsupportedOutboundError):
-        await adapter.reply_stream(event, "stream-1", "working…")
+    frame = {"body": {"chatid": "chat1", "text": {"content": "hello"}}}
+    event = message_event_from_frame(frame)
+
+    await adapter.reply_stream(event, "stream-1", "处理中…", finish=False)
+
+    adapter._client.reply_stream.assert_awaited_once_with(
+        frame,
+        "stream-1",
+        "处理中…",
+        False,
+    )
+
+
+@pytest.mark.asyncio
+async def test_wecom_reply_stream_finish() -> None:
+    adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
+    adapter._client = AsyncMock()
+    adapter._client.reply_stream = AsyncMock()
+
+    frame = {"body": {"chatid": "chat1", "text": {"content": "hello"}}}
+    event = message_event_from_frame(frame)
+
+    await adapter.reply_stream(event, "stream-1", "done", finish=True)
+
+    adapter._client.reply_stream.assert_awaited_once_with(
+        frame,
+        "stream-1",
+        "done",
+        True,
+    )
 
 
 @pytest.mark.asyncio
