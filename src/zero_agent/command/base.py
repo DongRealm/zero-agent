@@ -25,5 +25,6 @@ class CommandResult:
 @runtime_checkable
 class CommandHandler(Protocol):
     names: frozenset[str]
+    description_key: str
 
     async def run(self, ctx: CommandContext) -> CommandResult: ...

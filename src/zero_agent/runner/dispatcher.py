@@ -56,48 +56,52 @@ class MessageDispatcher:
             bind_thread_id(thread_id)
             use_stream = _supports_reply_stream(outbound)
             stream_id = thread_id
+            stream_open = False
 
             if use_stream and outbound is not None:
                 thinking = self._i18n.t("progress.thinking", locale)
                 await outbound.reply_stream(event, stream_id, thinking, finish=False)
+                stream_open = True
 
+            reply_content = self._i18n.t("error.agent_failed", locale)
+            ok = True
             try:
-                result = await self._agent.invoke(thread_id, event.content)
-            except AgentError:
-                logger.exception("agent.invoke_failed", duration_ms=_duration_ms(started))
-                error_message = self._i18n.t("error.agent_failed", locale)
-                await self._send_agent_result(
-                    outbound,
-                    event,
-                    error_message,
-                    stream_id=stream_id,
-                    use_stream=use_stream,
-                )
-                logger.info("dispatch.end", duration_ms=_duration_ms(started), route="agent", ok=False)
-                return
-            except Exception:
-                logger.exception("agent.invoke_failed", duration_ms=_duration_ms(started))
-                error_message = self._i18n.t("error.agent_failed", locale)
-                await self._send_agent_result(
-                    outbound,
-                    event,
-                    error_message,
-                    stream_id=stream_id,
-                    use_stream=use_stream,
-                )
-                logger.info("dispatch.end", duration_ms=_duration_ms(started), route="agent", ok=False)
-                return
+                try:
+                    result = await self._agent.invoke(thread_id, event.content)
+                    reply_content = result.content
+                except AgentError:
+                    logger.exception("agent.invoke_failed", duration_ms=_duration_ms(started))
+                    ok = False
+                except Exception:
+                    logger.exception("agent.invoke_failed", duration_ms=_duration_ms(started))
+                    ok = False
 
-            await self._send_agent_result(
-                outbound,
-                event,
-                result.content,
-                stream_id=stream_id,
-                use_stream=use_stream,
-            )
-            logger.info("dispatch.end", duration_ms=_duration_ms(started), route="agent", ok=True)
+                try:
+                    await self._deliver_agent_reply(
+                        outbound,
+                        event,
+                        reply_content,
+                        stream_id=stream_id,
+                        use_stream=use_stream,
+                    )
+                    stream_open = False
+                except Exception:
+                    logger.exception("dispatcher.deliver_failed", duration_ms=_duration_ms(started))
+                    ok = False
+            finally:
+                if stream_open:
+                    await self._recover_open_stream(
+                        outbound,
+                        event,
+                        stream_id,
+                        locale,
+                        use_stream=use_stream,
+                    )
+                    ok = False
 
-    async def _send_agent_result(
+            logger.info("dispatch.end", duration_ms=_duration_ms(started), route="agent", ok=ok)
+
+    async def _deliver_agent_reply(
         self,
         outbound: OutboundChannel | None,
         event: MessageEvent,
@@ -113,6 +117,33 @@ class MessageDispatcher:
             await outbound.reply_stream(event, stream_id, content, finish=True)
             return
         await outbound.reply(event, content)
+
+    async def _recover_open_stream(
+        self,
+        outbound: OutboundChannel | None,
+        event: MessageEvent,
+        stream_id: str,
+        locale: str,
+        *,
+        use_stream: bool,
+    ) -> None:
+        if outbound is None:
+            return
+
+        fallback = self._i18n.t("error.agent_failed", locale)
+        logger.error("dispatcher.stream_recover")
+
+        if use_stream:
+            try:
+                await outbound.reply_stream(event, stream_id, fallback, finish=True)
+                return
+            except Exception:
+                logger.exception("dispatcher.stream_recover_failed")
+
+        try:
+            await outbound.reply(event, fallback)
+        except Exception:
+            logger.exception("dispatcher.reply_recover_failed")
 
     async def _reply(
         self,

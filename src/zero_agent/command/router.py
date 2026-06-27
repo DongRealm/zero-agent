@@ -59,6 +59,10 @@ class CommandRouter:
         )
         return await matched.handler.run(dispatch_ctx)
 
+    @property
+    def handlers(self) -> list[CommandHandler]:
+        return list(self._handlers)
+
     def _rebuild_index(self) -> None:
         pairs: list[tuple[str, CommandHandler]] = []
         for handler in self._handlers:

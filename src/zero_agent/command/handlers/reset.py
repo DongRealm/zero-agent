@@ -11,6 +11,7 @@ RESET_NAMES = frozenset({"/reset", "/new", "重置", "新对话"})
 
 class ResetCommand:
     names = RESET_NAMES
+    description_key = "command.reset.description"
 
     def __init__(self, registry: SessionRegistry, i18n: I18n | None = None) -> None:
         self._registry = registry

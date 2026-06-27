@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 
 from zero_agent.agent import AgentService
-from zero_agent.command import CommandRouter, LangCommand, ResetCommand
+from zero_agent.command import CommandRouter, HelpCommand, LangCommand, ResetCommand
 from zero_agent.gateway.protocol import BaseAdapter
 from zero_agent.gateway.registry import build_adapters
 from zero_agent.gateway.runner import GateRunner
@@ -55,6 +55,7 @@ class ApplicationRunner:
                 LangCommand(self._registry),
             ]
         )
+        self._commands.register(HelpCommand(self._commands))
         self._cron = CronRunner(
             interval=60,
             on_tick=session_expire_tick(self._registry, self._settings.session_ttl_seconds),
