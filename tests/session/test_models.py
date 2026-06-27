@@ -54,7 +54,7 @@ def test_session_key_from_event_without_session_id() -> None:
 
 def test_session_record_touch() -> None:
     key = SessionKey(platform="wecom", chat_id="chat1", user_id="user1")
-    record = SessionRecord(key=key, thread_id=key.to_id())
+    record = SessionRecord(key=key, active_thread_id=key.to_id())
     updated = record.touch(at=datetime(2026, 1, 1, tzinfo=UTC))
     assert updated.last_active_at == datetime(2026, 1, 1, tzinfo=UTC)
     assert updated.session_id == "wecom:chat1:user1"

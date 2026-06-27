@@ -72,3 +72,4 @@ minversion = "8.0"
 addopts = "-ra -q --strict-markers --cov=zero_agent --cov-report=term-missing"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+pythonpath = ["."]

@@ -4,10 +4,16 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
+from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from zero_agent.gateway.protocol import MessageEvent
+
+
+class ThreadStatus(StrEnum):
+    ACTIVE = "active"
+    CLOSED = "closed"
 
 
 @dataclass(frozen=True)
@@ -51,9 +57,23 @@ class SessionKey:
 
 
 @dataclass
-class SessionRecord:
-    key: SessionKey
+class SessionThreadRecord:
+    """One conversation thread line under a session."""
+
     thread_id: str
+    session_id: str
+    generation: int
+    status: ThreadStatus
+    started_at: datetime
+    ended_at: datetime | None = None
+
+
+@dataclass
+class SessionRecord:
+    """Current session pointer; active thread lives in session_threads."""
+
+    key: SessionKey
+    active_thread_id: str
     locale: str = "zh"
     generation: int = 1
     last_active_at: datetime | None = None
@@ -63,10 +83,15 @@ class SessionRecord:
     def session_id(self) -> str:
         return self.key.to_id()
 
+    @property
+    def thread_id(self) -> str:
+        """Alias for the active LangGraph thread_id."""
+        return self.active_thread_id
+
     def touch(self, at: datetime | None = None) -> SessionRecord:
         return SessionRecord(
             key=self.key,
-            thread_id=self.thread_id,
+            active_thread_id=self.active_thread_id,
             locale=self.locale,
             generation=self.generation,
             last_active_at=at or datetime.now(UTC),
