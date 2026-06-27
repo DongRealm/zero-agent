@@ -1,0 +1,10 @@
+command:
+  reset:
+    done: "已开启新对话，上下文已清空。"
+  lang:
+    done: "语言已切换为中文。"
+    invalid: "用法：/lang zh 或 /lang en"
+error:
+  agent_failed: "处理失败，请稍后重试或发送 /reset 重新开始。"
+progress:
+  thinking: "处理中…"

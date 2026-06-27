@@ -1,0 +1,10 @@
+command:
+  reset:
+    done: "New conversation started. Context cleared."
+  lang:
+    done: "Language switched to English."
+    invalid: "Usage: /lang zh or /lang en"
+error:
+  agent_failed: "Something went wrong. Please retry or send /reset to start over."
+progress:
+  thinking: "Working on it…"
