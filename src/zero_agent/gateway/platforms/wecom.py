@@ -6,18 +6,19 @@ from aibot import WSClient, WSClientOptions
 from pydantic import SecretStr
 
 from zero_agent.gateway.protocol import BaseAdapter, MessageEvent, MessageType
+from zero_agent.session.models import SessionKey
 
 
 def parse_wecom_session_id(frame: dict[str, Any]) -> str:
     """Build interim session_id from WeCom callback frame."""
+    return wecom_session_key_from_frame(frame).to_id()
+
+
+def wecom_session_key_from_frame(frame: dict[str, Any]) -> SessionKey:
     body = frame.get("body") or {}
     chat_id = _first_str(body, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
     user_id = _first_str(body, "userid", "user_id") or _first_str(frame, "userid", "user_id")
-    if chat_id and user_id:
-        return f"wecom:{chat_id}:{user_id}"
-    if chat_id:
-        return f"wecom:{chat_id}"
-    return "wecom:unknown"
+    return SessionKey(platform="wecom", chat_id=chat_id, user_id=user_id or None)
 
 
 def _first_str(data: dict[str, Any], *keys: str) -> str:
