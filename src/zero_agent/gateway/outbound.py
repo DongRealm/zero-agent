@@ -53,7 +53,11 @@ class OutboundChannel(Protocol):
         ...
 
     async def push(self, target: PushTarget, content: str) -> None:
-        """Proactive push outside callback (WeCom: client.send_message)."""
+        """Proactive push outside callback window.
+
+        WeCom: ``client.send_message(chatid, body)`` where ``chatid`` is the
+        user's ``userid`` (direct chat) or group ``chatid`` from ``PushTarget``.
+        """
         ...
 
     async def request_approval(self, event: MessageEvent, req: ApprovalRequest) -> None:

@@ -6,7 +6,6 @@ from pydantic import SecretStr
 from zero_agent.gateway.outbound import (
     AdapterCapabilities,
     ApprovalRequest,
-    UnsupportedOutboundError,
 )
 from zero_agent.gateway.platforms.wecom import WecomAdapter, message_event_from_frame
 from zero_agent.gateway.protocol import PushTarget
@@ -30,7 +29,7 @@ def test_approval_request_fields() -> None:
 
 def test_wecom_adapter_capabilities() -> None:
     adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
-    assert adapter.capabilities == AdapterCapabilities(reply=True, reply_stream=True)
+    assert adapter.capabilities == AdapterCapabilities(reply=True, reply_stream=True, push=True)
 
 
 @pytest.mark.asyncio
@@ -89,8 +88,28 @@ async def test_wecom_reply_stream_finish() -> None:
 
 
 @pytest.mark.asyncio
-async def test_wecom_push_not_implemented() -> None:
+async def test_wecom_push_uses_send_message() -> None:
     adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
+    adapter._client = AsyncMock()
+    adapter._client.send_message = AsyncMock()
 
-    with pytest.raises(UnsupportedOutboundError):
-        await adapter.push(PushTarget(chat_id="chat1"), "done")
+    await adapter.push(PushTarget(chat_id="chat1", chat_type=2), "task done")
+
+    adapter._client.send_message.assert_awaited_once_with(
+        "chat1",
+        {"msgtype": "markdown", "markdown": {"content": "task done"}},
+    )
+
+
+@pytest.mark.asyncio
+async def test_wecom_push_direct_chat() -> None:
+    adapter = WecomAdapter(bot_id="bot", secret=SecretStr("secret"))
+    adapter._client = AsyncMock()
+    adapter._client.send_message = AsyncMock()
+
+    await adapter.push(PushTarget(chat_id="user1", chat_type=1), "hello")
+
+    adapter._client.send_message.assert_awaited_once_with(
+        "user1",
+        {"msgtype": "markdown", "markdown": {"content": "hello"}},
+    )
