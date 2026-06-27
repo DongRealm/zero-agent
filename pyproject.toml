@@ -9,6 +9,7 @@ authors = [
     { name = "Dong Realm", email = "dongrealm@163.com" }
 ]
 dependencies = [
+    "aiosqlite>=0.21.0",
     "pydantic-settings>=2.14.2",
     "wecom-aibot-python-sdk>=1.0.2",
 ]

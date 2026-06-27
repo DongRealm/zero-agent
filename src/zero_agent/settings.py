@@ -23,11 +23,22 @@ class Settings(BaseSettings):
 
     # Storage
     data_dir: str = Field(default=".local", description="Directory to store data")
+    session_db_path: str | None = Field(
+        default=None,
+        description="Path to session registry database; defaults to {data_dir}/session.db",
+    )
+    default_locale: str = Field(default="zh", description="Default locale for new sessions")
+
+    @property
+    def resolved_session_db_path(self) -> str:
+        if self.session_db_path:
+            return self.session_db_path
+        return f"{self.data_dir}/session.db"
 
     @property
     def db_path(self) -> str:
-        """Path to the database file."""
-        return f"{self.data_dir}/zero.db"
+        """Deprecated alias for resolved_session_db_path."""
+        return self.resolved_session_db_path
 
 
 settings = Settings()
