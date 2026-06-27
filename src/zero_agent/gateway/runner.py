@@ -3,6 +3,7 @@ import time
 from collections.abc import Coroutine
 from typing import Any
 
+from zero_agent.gateway.outbound import OutboundChannel
 from zero_agent.gateway.protocol import BaseAdapter, MessageEvent
 from zero_agent.observability.setup import get_logger
 from zero_agent.runner.dispatcher import MessageDispatcher
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 
 
 class GateRunner:
-    def __init__(self) -> None:
+    def __init__(self, dispatcher: MessageDispatcher) -> None:
         self.adapters: dict[str, BaseAdapter] = {}
         self._running = False
         self._shutdown_event = asyncio.Event()
@@ -19,7 +20,7 @@ class GateRunner:
         self._running_agents: dict[str, asyncio.Task[None]] = {}
         self._failed_platforms: dict[str, dict[str, Any]] = {}
         self._background_tasks: set[asyncio.Task[None]] = set()
-        self._dispatcher = MessageDispatcher()
+        self._dispatcher = dispatcher
 
     async def start(self) -> bool:
         for name, adapter in self.adapters.items():
@@ -79,7 +80,14 @@ class GateRunner:
         await self._shutdown_event.wait()
 
     async def handle_message(self, event: MessageEvent) -> str | None:
-        return await self._dispatcher.handle(event)
+        outbound = self._outbound_for(event)
+        return await self._dispatcher.handle(event, outbound)
+
+    def _outbound_for(self, event: MessageEvent) -> OutboundChannel | None:
+        adapter = self.adapters.get(event.platform)
+        if adapter is not None and hasattr(adapter, "reply"):
+            return adapter  # type: ignore[return-value]
+        return None
 
     def _start_background_task(self, coro: Coroutine[Any, Any, None]) -> None:
         task = asyncio.create_task(coro)
