@@ -8,6 +8,7 @@ from zero_agent.session.models import SessionKey
 
 class StubLangCommand:
     names = frozenset({"/lang", "/语言"})
+    description_key = "command.lang.description"
 
     async def run(self, ctx: CommandContext) -> CommandResult:
         locale = ctx.args[0] if ctx.args else "unknown"
@@ -16,6 +17,7 @@ class StubLangCommand:
 
 class StubResetCommand:
     names = frozenset({"/reset", "/new", "重置", "新对话"})
+    description_key = "command.reset.description"
 
     async def run(self, _ctx: CommandContext) -> CommandResult:
         return CommandResult(message="reset:ok")

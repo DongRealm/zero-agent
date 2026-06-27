@@ -1,3 +1,5 @@
+import json
+
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
 from pydantic import SecretStr
@@ -5,7 +7,34 @@ from tests.agent.helpers import ToolFakeChatModel
 
 from zero_agent.agent import AgentResult, AgentService
 from zero_agent.agent.types import AgentError
+from zero_agent.observability import configure_logging
 from zero_agent.settings import Settings
+
+
+def _parse_log_lines(capsys: pytest.CaptureFixture[str]) -> list[dict[str, object]]:
+    err = capsys.readouterr().err.strip()
+    if not err:
+        return []
+    return [json.loads(line) for line in err.splitlines() if line.strip()]
+
+
+@pytest.mark.asyncio
+async def test_invoke_emits_llm_callback_logs(capsys: pytest.CaptureFixture[str], tmp_path) -> None:
+    configure_logging(level="INFO", json=True)
+    settings = Settings(openai_api_key=SecretStr("sk-test"), workspace_dir=str(tmp_path))
+    service = AgentService.from_settings(
+        settings,
+        checkpointer=MemorySaver(),
+        model=ToolFakeChatModel(responses=["hello back"]),
+    )
+
+    await service.invoke("thread-callback", "hello")
+
+    events = [line["event"] for line in _parse_log_lines(capsys)]
+    assert "llm.start" in events
+    assert "llm.end" in events
+    assert "agent.invoke.start" in events
+    assert "agent.invoke.end" in events
 
 
 @pytest.fixture

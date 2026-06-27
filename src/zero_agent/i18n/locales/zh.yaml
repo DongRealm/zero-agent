@@ -1,9 +1,14 @@
 command:
   reset:
     done: "已开启新对话，上下文已清空。"
+    description: "开启新对话"
   lang:
     done: "语言已切换为中文。"
     invalid: "用法：/lang zh 或 /lang en"
+    description: "切换语言（用法：/lang zh 或 /lang en）"
+  help:
+    header: "可用命令："
+    description: "显示此帮助"
 error:
   agent_failed: "处理失败，请稍后重试或发送 /reset 重新开始。"
 progress:

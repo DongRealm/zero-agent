@@ -78,8 +78,12 @@ def _first_int(data: dict[str, Any], *keys: str) -> int | None:
     return None
 
 
+def _markdown_body(content: str) -> dict[str, Any]:
+    return {"msgtype": "markdown", "markdown": {"content": content}}
+
+
 class WecomAdapter(BaseAdapter, OutboundChannel):
-    capabilities = AdapterCapabilities(reply=True)
+    capabilities = AdapterCapabilities(reply=True, reply_stream=True, push=True)
 
     def __init__(self, bot_id: str, secret: SecretStr) -> None:
         super().__init__(name="wecom")
@@ -116,10 +120,7 @@ class WecomAdapter(BaseAdapter, OutboundChannel):
 
     async def reply(self, event: MessageEvent, content: str) -> None:
         frame = event.reply_to or event.extra or {}
-        await self._client.reply(
-            frame,
-            {"msgtype": "markdown", "markdown": {"content": content}},
-        )
+        await self._client.reply(frame, _markdown_body(content))
 
     async def reply_stream(
         self,
@@ -129,12 +130,11 @@ class WecomAdapter(BaseAdapter, OutboundChannel):
         *,
         finish: bool = False,
     ) -> None:
-        del event, stream_id, content, finish
-        raise UnsupportedOutboundError("WeCom reply_stream not implemented yet")
+        frame = event.reply_to or event.extra or {}
+        await self._client.reply_stream(frame, stream_id, content, finish)
 
     async def push(self, target: PushTarget, content: str) -> None:
-        del target, content
-        raise UnsupportedOutboundError("WeCom push not implemented yet")
+        await self._client.send_message(target.chat_id, _markdown_body(content))
 
     async def request_approval(self, event: MessageEvent, req: ApprovalRequest) -> None:
         del event, req

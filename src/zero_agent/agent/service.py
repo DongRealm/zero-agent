@@ -13,6 +13,7 @@ from langgraph.graph.state import CompiledStateGraph
 
 from zero_agent.agent.factory import build_agent_graph
 from zero_agent.agent.types import AgentError, AgentResult
+from zero_agent.observability.callbacks import AgentLoggingCallback
 from zero_agent.observability.context import bind_thread_id
 from zero_agent.observability.setup import get_logger
 from zero_agent.settings import Settings
@@ -42,7 +43,10 @@ class AgentService:
         bind_thread_id(thread_id)
         started = time.monotonic()
         logger.info("agent.invoke.start", content_len=len(message))
-        config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
+        config: RunnableConfig = {
+            "configurable": {"thread_id": thread_id},
+            "callbacks": [AgentLoggingCallback()],
+        }
         try:
             state = await self._graph.ainvoke(
                 {"messages": [HumanMessage(content=message)]},

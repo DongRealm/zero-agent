@@ -1,1 +1,1 @@
-"""Tests for zero-agent framework."""
+"""Tests for the Zero Agent personal assistant service."""

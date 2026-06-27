@@ -1,4 +1,4 @@
-"""Logging configuration for Zero Agent."""
+"""Logging configuration for Zero Agent personal assistant service."""
 
 from __future__ import annotations
 

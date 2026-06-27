@@ -14,8 +14,9 @@ from langgraph.graph.state import CompiledStateGraph
 from zero_agent.settings import Settings
 
 _DEFAULT_SYSTEM_PROMPT = (
-    "You are Zero Agent, a helpful coding assistant for Code Self-Inspection tasks. "
-    "Answer clearly and prefer actionable guidance."
+    "You are Zero, a personal assistant. "
+    "Help the user solve problems, clarify options, and support daily planning when asked. "
+    "Be concise, friendly, and practical. Reply in the user's language."
 )
 
 

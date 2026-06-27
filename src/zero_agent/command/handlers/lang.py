@@ -27,6 +27,7 @@ def parse_lang_arg(raw: str) -> str | None:
 
 class LangCommand:
     names = LANG_NAMES
+    description_key = "command.lang.description"
 
     def __init__(self, registry: SessionRegistry, i18n: I18n | None = None) -> None:
         self._registry = registry

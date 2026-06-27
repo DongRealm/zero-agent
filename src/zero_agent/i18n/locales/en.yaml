@@ -1,9 +1,14 @@
 command:
   reset:
     done: "New conversation started. Context cleared."
+    description: "Start a new conversation"
   lang:
     done: "Language switched to English."
     invalid: "Usage: /lang zh or /lang en"
+    description: "Switch language (usage: /lang zh or /lang en)"
+  help:
+    header: "Available commands:"
+    description: "Show this help"
 error:
   agent_failed: "Something went wrong. Please retry or send /reset to start over."
 progress:
