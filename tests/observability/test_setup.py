@@ -2,7 +2,12 @@ import json
 
 import pytest
 
-from zero_agent.observability import bind_contextvars, clear_contextvars, configure_logging, get_logger
+from zero_agent.observability import (
+    bind_contextvars,
+    clear_contextvars,
+    configure_logging,
+    get_logger,
+)
 from zero_agent.settings import Settings
 
 

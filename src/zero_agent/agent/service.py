@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 from typing import Any
 
 from langchain_core.language_models.chat_models import BaseChatModel
@@ -12,7 +13,11 @@ from langgraph.graph.state import CompiledStateGraph
 
 from zero_agent.agent.factory import build_agent_graph
 from zero_agent.agent.types import AgentError, AgentResult
+from zero_agent.observability.context import bind_thread_id
+from zero_agent.observability.setup import get_logger
 from zero_agent.settings import Settings
+
+logger = get_logger(__name__)
 
 
 class AgentService:
@@ -34,6 +39,9 @@ class AgentService:
 
     async def invoke(self, thread_id: str, message: str) -> AgentResult:
         """Run one user turn on the given LangGraph thread."""
+        bind_thread_id(thread_id)
+        started = time.monotonic()
+        logger.info("agent.invoke.start", content_len=len(message))
         config: RunnableConfig = {"configurable": {"thread_id": thread_id}}
         try:
             state = await self._graph.ainvoke(
@@ -41,10 +49,16 @@ class AgentService:
                 config=config,
             )
         except Exception as exc:
+            logger.exception("agent.invoke.error", duration_ms=_duration_ms(started))
             raise AgentError(str(exc), thread_id=thread_id) from exc
 
         content = _extract_assistant_content(state)
+        logger.info("agent.invoke.end", duration_ms=_duration_ms(started), content_len=len(content))
         return AgentResult(content=content, thread_id=thread_id)
+
+
+def _duration_ms(started: float) -> int:
+    return int((time.monotonic() - started) * 1000)
 
 
 def _extract_assistant_content(state: dict[str, Any]) -> str:
