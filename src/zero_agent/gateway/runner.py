@@ -3,7 +3,7 @@ import time
 from collections.abc import Coroutine
 from typing import Any
 
-from zero_agent.gateway.base_adapter import BaseAdapter, MessageEvent
+from zero_agent.gateway.protocol import BaseAdapter, MessageEvent
 from zero_agent.runner.dispatcher import MessageDispatcher
 
 

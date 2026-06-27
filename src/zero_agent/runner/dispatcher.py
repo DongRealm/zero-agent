@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 
-from zero_agent.gateway.base_adapter import MessageEvent
+from zero_agent.gateway.protocol import MessageEvent
 
 
 class MessageDispatcher:

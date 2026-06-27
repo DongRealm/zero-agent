@@ -5,7 +5,7 @@ from typing import Any
 from aibot import WSClient, WSClientOptions
 from pydantic import SecretStr
 
-from zero_agent.gateway.base_adapter import BaseAdapter, MessageEvent, MessageType
+from zero_agent.gateway.protocol import BaseAdapter, MessageEvent, MessageType
 
 
 class WecomAdapter(BaseAdapter):
