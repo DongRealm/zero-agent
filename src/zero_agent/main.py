@@ -1,7 +1,7 @@
 import asyncio
 
 from zero_agent import __version__
-from zero_agent.gateway.runner import start_gateway
+from zero_agent.runner.app import run_application
 from zero_agent.settings import settings
 
 
@@ -17,7 +17,7 @@ def main() -> None:
     print("  Zero Agent ready. Pleace Ctrl+C to stop.")
     print()
 
-    success = asyncio.run(start_gateway())
+    success = asyncio.run(run_application())
     if not success:
         exit(1)
 

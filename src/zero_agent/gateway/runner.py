@@ -4,16 +4,7 @@ from collections.abc import Coroutine
 from typing import Any
 
 from zero_agent.gateway.base_adapter import BaseAdapter, MessageEvent
-from zero_agent.gateway.wecom_adapter import WecomAdapter
 from zero_agent.runner.dispatcher import MessageDispatcher
-from zero_agent.runner.lifecycle import (
-    CronRunner,
-    acquire_pid_file,
-    install_exception_handler,
-    register_signal_handlers,
-    release_pid_file,
-)
-from zero_agent.settings import settings
 
 
 class GateRunner:
@@ -127,38 +118,3 @@ class GateRunner:
                     print(f"{name} 重连失败: {e}")
 
             await asyncio.sleep(5)
-
-
-async def start_gateway() -> bool:
-    if not acquire_pid_file():
-        return False
-
-    try:
-        runner = GateRunner()
-
-        if settings.wecom_bot_id and settings.wecom_bot_secret:
-            wecom_adapter = WecomAdapter(
-                bot_id=settings.wecom_bot_id,
-                secret=settings.wecom_bot_secret,
-            )
-            wecom_adapter.set_message_handler(runner.handle_message)
-            runner.adapters["wecom"] = wecom_adapter
-
-        loop = asyncio.get_running_loop()
-        register_signal_handlers(loop, runner.stop)
-        install_exception_handler(loop)
-
-        success = await runner.start()
-        if not success:
-            return False
-
-        cron = CronRunner(interval=60)
-        cron.start()
-
-        await runner.await_for_shutdown()
-
-        cron.stop()
-        return True
-
-    finally:
-        release_pid_file()
