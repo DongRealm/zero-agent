@@ -121,3 +121,47 @@ async def test_wecom_reset_command_through_pipeline(
         assert reply_body["markdown"]["content"] == "已开启新对话，上下文已清空。"
     finally:
         await registry.close()
+
+
+@pytest.mark.asyncio
+async def test_wecom_lang_command_through_pipeline(
+    pipeline_settings: Settings,
+    tmp_path: Path,
+) -> None:
+    registry = SessionRegistry(str(tmp_path / "session.db"), default_locale="zh")
+    await registry.open()
+    try:
+        agent = AgentService.from_settings(
+            pipeline_settings,
+            checkpointer=MemorySaver(),
+            model=ToolFakeChatModel(responses=["unused"]),
+        )
+        commands = CommandRouter(
+            [
+                ResetCommand(registry),
+                LangCommand(registry),
+            ]
+        )
+        adapter = WecomAdapter(
+            bot_id=pipeline_settings.wecom_bot_id or "",
+            secret=pipeline_settings.wecom_bot_secret,
+        )
+        adapter._client = AsyncMock()
+        adapter._client.reply = AsyncMock()
+
+        wire_gate_runner(registry, commands, agent, {"wecom": adapter})
+
+        frame = {
+            "body": {
+                "chatid": "chat1",
+                "userid": "user1",
+                "text": {"content": "/lang en"},
+            }
+        }
+        await adapter.handle_message(message_event_from_frame(frame))
+        await asyncio.sleep(0.05)
+
+        reply_body = adapter._client.reply.await_args.args[1]
+        assert reply_body["markdown"]["content"] == "Language switched to English."
+    finally:
+        await registry.close()
