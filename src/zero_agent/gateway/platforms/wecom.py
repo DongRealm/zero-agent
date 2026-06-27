@@ -6,7 +6,10 @@ from aibot import WSClient, WSClientOptions
 from pydantic import SecretStr
 
 from zero_agent.gateway.protocol import BaseAdapter, MessageEvent, MessageType
+from zero_agent.observability.setup import get_logger
 from zero_agent.session.models import SessionKey
+
+logger = get_logger(__name__)
 
 
 def parse_wecom_session_id(frame: dict[str, Any]) -> str:
@@ -51,15 +54,22 @@ class WecomAdapter(BaseAdapter):
         self._client.on("message.text")(self._on_text)
 
     def _on_authenticated(self) -> None:
-        print(f"[{self.name}] 认证成功")
+        logger.info("adapter.authenticated", platform=self.name)
 
     async def _on_text(self, frame: dict[str, Any]) -> None:
         body = frame.get("body", {})
-        print(f"[{self.name}] 收到消息: {body}")
+        content = body.get("text", {}).get("content", "")
+        session_id = parse_wecom_session_id(frame)
+        logger.info(
+            "message.received",
+            platform=self.name,
+            session_id=session_id,
+            content_len=len(content),
+        )
         event = MessageEvent(
             platform=self.name,
-            session_id=parse_wecom_session_id(frame),
-            content=body.get("text", {}).get("content", ""),
+            session_id=session_id,
+            content=content,
             msg_type=MessageType.TEXT,
             extra=frame,
         )

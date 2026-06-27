@@ -11,8 +11,11 @@ from concurrent.futures import Future
 from pathlib import Path
 from typing import Any
 
+from zero_agent.observability.setup import get_logger
 from zero_agent.session.registry import SessionRegistry
 from zero_agent.settings import settings
+
+logger = get_logger(__name__)
 
 
 def pid_file_path() -> Path:
@@ -26,7 +29,7 @@ def acquire_pid_file() -> bool:
         old_pid = int(pid_file.read_text().strip())
         try:
             os.kill(old_pid, 0)
-            print(f"Gateway is already running with PID {old_pid}. Exiting.")
+            logger.error("lifecycle.pid_conflict", pid=old_pid)
             return False
         except ProcessLookupError:
             pid_file.unlink()
@@ -43,7 +46,7 @@ def register_signal_handlers(
     on_shutdown: Callable[[], Coroutine[Any, Any, None]],
 ) -> None:
     def shutdown_handler(sig: signal.Signals) -> None:
-        print(f"Received signal {sig}. Shutting down...")
+        logger.info("lifecycle.shutdown", signal=sig.name)
         asyncio.create_task(on_shutdown())
 
     for sig in (signal.SIGINT, signal.SIGTERM):
@@ -54,7 +57,7 @@ def install_exception_handler(loop: asyncio.AbstractEventLoop) -> None:
     def exception_handler(loop: asyncio.AbstractEventLoop, context: dict[str, object]) -> None:
         exc = context.get("exception")
         if isinstance(exc, (ConnectionError, TimeoutError, OSError)):
-            print(f"吞吐瞬时网络错误：{exc}")
+            logger.warning("lifecycle.network_error", exc_info=exc)
         else:
             loop.default_exception_handler(context)
 
@@ -70,8 +73,8 @@ def _schedule_tick_callback(
     def _log_failure(done: Future[None]) -> None:
         try:
             done.result()
-        except Exception as exc:
-            print(f"Cron tick callback failed: {exc}")
+        except Exception:
+            logger.exception("lifecycle.cron_error")
 
     future.add_done_callback(_log_failure)
 
@@ -82,15 +85,15 @@ def cron_ticker(
     interval: int = 60,
     on_tick: Callable[[], Coroutine[Any, Any, None]] | None = None,
 ) -> None:
-    print(f"Cron ticker started. Interval: {interval}s")
+    logger.info("lifecycle.cron_start", interval_s=interval)
     tick_count = 0
     while not stop_event.is_set():
         if on_tick is not None:
             _schedule_tick_callback(loop, on_tick)
-        print(f"Cron tick {tick_count}")
+        logger.debug("lifecycle.cron_tick", tick=tick_count)
         tick_count += 1
         stop_event.wait(timeout=interval)
-    print("Cron ticker stopped")
+    logger.info("lifecycle.cron_stop")
 
 
 class CronRunner:
@@ -132,6 +135,6 @@ def session_expire_tick(
     async def on_tick() -> None:
         purged = await registry.expire_stale(ttl_seconds=ttl_seconds)
         if purged:
-            print(f"Session maintenance: purged {len(purged)} closed thread(s)")
+            logger.info("session.expire_stale", count=len(purged))
 
     return on_tick

@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
+from zero_agent.observability.setup import get_logger
+
 
 class MessageType(StrEnum):
     """Message type enumeration."""
@@ -40,6 +42,8 @@ class MessageEvent:
 
 
 MessageHandler = Callable[[MessageEvent], Awaitable[str | None]]
+
+logger = get_logger(__name__)
 
 
 class BaseAdapter(ABC):
@@ -108,9 +112,14 @@ class BaseAdapter(ABC):
     async def _send_reply(self, _event: MessageEvent, reply: str) -> None:
         """Send a reply. Subclasses can override this for platform-specific reply logic.
 
-        Default implementation prints to console.
+        Default implementation logs the reply (platform adapters should override).
         """
-        print(f"  [{self.name}] {reply}")
+        logger.info(
+            "gateway.reply",
+            platform=self.name,
+            session_id=_event.session_id or None,
+            content_len=len(reply),
+        )
 
     async def _dispatch(self, event: MessageEvent) -> str | None:
         """Dispatch the message event to the handler."""
