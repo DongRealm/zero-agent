@@ -10,6 +10,7 @@ authors = [
 ]
 dependencies = [
     "pydantic-settings>=2.14.2",
+    "wecom-aibot-python-sdk>=1.0.2",
 ]
 
 [project.optional-dependencies]
@@ -59,6 +60,10 @@ known-first-party = ["zero_agent"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
+
+[[tool.mypy.overrides]]
+module = ["aibot", "aibot.*"]
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 minversion = "8.0"
