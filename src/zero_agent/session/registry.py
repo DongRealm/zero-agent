@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
 
+from zero_agent.session.checkpoint import delete_thread
 from zero_agent.session.models import SessionKey, SessionRecord, SessionThreadRecord, ThreadStatus
 
 _SCHEMA = """
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS session_threads (
 );
 
 CREATE INDEX IF NOT EXISTS idx_session_threads_session_id ON session_threads(session_id);
+CREATE INDEX IF NOT EXISTS idx_session_threads_closed ON session_threads(status, ended_at);
 """
 
 
@@ -46,7 +48,7 @@ class SessionRegistry:
     ) -> None:
         self._db_path = db_path
         self._default_locale = default_locale
-        # Reserved for future TTL/archive of closed threads (step 11+).
+        # Used by expire_stale to purge closed thread checkpoints.
         self._checkpoint_db_path = checkpoint_db_path
         self._conn: aiosqlite.Connection | None = None
 
@@ -166,6 +168,46 @@ class SessionRegistry:
             started_at=now,
         )
         return new_thread_id
+
+    async def expire_stale(
+        self,
+        *,
+        ttl_seconds: int,
+        now: datetime | None = None,
+    ) -> list[str]:
+        """Purge closed threads whose ``ended_at`` is older than ``ttl_seconds``.
+
+        Deletes matching ``session_threads`` rows and, when configured, checkpoint data.
+        Active threads are never purged.
+        """
+        if ttl_seconds <= 0:
+            return []
+
+        current = now or datetime.now(UTC)
+        cutoff = current - timedelta(seconds=ttl_seconds)
+        conn = self._require_conn()
+        cursor = await conn.execute(
+            """
+            SELECT thread_id
+            FROM session_threads
+            WHERE status = ? AND ended_at IS NOT NULL AND ended_at < ?
+            """,
+            (ThreadStatus.CLOSED, cutoff.isoformat()),
+        )
+        rows = await cursor.fetchall()
+        purged: list[str] = []
+        for row in rows:
+            thread_id = str(row[0])
+            if self._checkpoint_db_path:
+                await delete_thread(self._checkpoint_db_path, thread_id)
+            await conn.execute(
+                "DELETE FROM session_threads WHERE thread_id = ?",
+                (thread_id,),
+            )
+            purged.append(thread_id)
+        if purged:
+            await conn.commit()
+        return purged
 
     def _require_conn(self) -> aiosqlite.Connection:
         if self._conn is None:

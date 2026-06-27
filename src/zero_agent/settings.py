@@ -32,6 +32,10 @@ class Settings(BaseSettings):
         description="Path to LangGraph checkpoint database; defaults to {data_dir}/checkpoints.db",
     )
     default_locale: str = Field(default="zh", description="Default locale for new sessions")
+    session_ttl_seconds: int = Field(
+        default=604_800,
+        description="TTL for closed session threads before checkpoint purge (default 7 days)",
+    )
 
     @property
     def resolved_session_db_path(self) -> str:

@@ -20,3 +20,13 @@ def test_resolved_checkpoint_db_path_default() -> None:
 def test_resolved_checkpoint_db_path_override() -> None:
     settings = Settings(checkpoint_db_path="/tmp/checkpoints.db")
     assert settings.resolved_checkpoint_db_path == "/tmp/checkpoints.db"
+
+
+def test_session_ttl_seconds_default() -> None:
+    settings = Settings()
+    assert settings.session_ttl_seconds == 604_800
+
+
+def test_session_ttl_seconds_override() -> None:
+    settings = Settings(session_ttl_seconds=3600)
+    assert settings.session_ttl_seconds == 3600
