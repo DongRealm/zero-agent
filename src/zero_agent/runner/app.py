@@ -6,7 +6,8 @@ import asyncio
 
 from zero_agent.agent import AgentService
 from zero_agent.command import CommandRouter, LangCommand, ResetCommand
-from zero_agent.gateway.platforms.wecom import WecomAdapter
+from zero_agent.gateway.protocol import BaseAdapter
+from zero_agent.gateway.registry import build_adapters
 from zero_agent.gateway.runner import GateRunner
 from zero_agent.runner.dispatcher import MessageDispatcher
 from zero_agent.runner.lifecycle import (
@@ -17,22 +18,36 @@ from zero_agent.runner.lifecycle import (
     release_pid_file,
     session_expire_tick,
 )
+from zero_agent.session.checkpoint import CheckpointStore
 from zero_agent.session.registry import SessionRegistry
-from zero_agent.settings import settings
+from zero_agent.settings import Settings
+from zero_agent.settings import settings as default_settings
 
 
-def wecom_enabled() -> bool:
-    return bool(settings.wecom_bot_id and settings.wecom_bot_secret.get_secret_value())
+def wire_gate_runner(
+    registry: SessionRegistry,
+    commands: CommandRouter,
+    agent: AgentService,
+    adapters: dict[str, BaseAdapter],
+) -> GateRunner:
+    """Wire registry, commands, agent, and adapters into a GateRunner."""
+    dispatcher = MessageDispatcher(registry, commands, agent)
+    runner = GateRunner(dispatcher)
+    for name, adapter in adapters.items():
+        adapter.set_message_handler(runner.handle_message)
+        runner.adapters[name] = adapter
+    return runner
 
 
 class ApplicationRunner:
     """Orchestrates process lifecycle and gateway adapters."""
 
-    def __init__(self) -> None:
+    def __init__(self, *, settings: Settings | None = None) -> None:
+        self._settings = settings or default_settings
         self._registry = SessionRegistry(
-            settings.resolved_session_db_path,
-            default_locale=settings.default_locale,
-            checkpoint_db_path=settings.resolved_checkpoint_db_path,
+            self._settings.resolved_session_db_path,
+            default_locale=self._settings.default_locale,
+            checkpoint_db_path=self._settings.resolved_checkpoint_db_path,
         )
         self._commands = CommandRouter(
             [
@@ -40,41 +55,37 @@ class ApplicationRunner:
                 LangCommand(self._registry),
             ]
         )
-        self._agent = AgentService.from_settings(settings)
-        self._dispatcher = MessageDispatcher(
-            self._registry,
-            self._commands,
-            self._agent,
-        )
-        self._runner = GateRunner(self._dispatcher)
         self._cron = CronRunner(
             interval=60,
-            on_tick=session_expire_tick(self._registry, settings.session_ttl_seconds),
+            on_tick=session_expire_tick(self._registry, self._settings.session_ttl_seconds),
         )
+        self._runner: GateRunner | None = None
+        self._checkpoint: CheckpointStore | None = None
 
     @property
     def runner(self) -> GateRunner:
+        if self._runner is None:
+            raise RuntimeError("ApplicationRunner is not running")
         return self._runner
-
-    def _register_adapters(self) -> None:
-        if not wecom_enabled():
-            return
-        bot_id = settings.wecom_bot_id
-        assert bot_id is not None
-        wecom_adapter = WecomAdapter(
-            bot_id=bot_id,
-            secret=settings.wecom_bot_secret,
-        )
-        wecom_adapter.set_message_handler(self._runner.handle_message)
-        self._runner.adapters["wecom"] = wecom_adapter
 
     async def run(self) -> bool:
         if not acquire_pid_file():
             return False
 
         await self._registry.open()
+        self._checkpoint = CheckpointStore(self._settings.resolved_checkpoint_db_path)
+        await self._checkpoint.__aenter__()
         try:
-            self._register_adapters()
+            agent = AgentService.from_settings(
+                self._settings,
+                checkpointer=self._checkpoint.saver,
+            )
+            self._runner = wire_gate_runner(
+                self._registry,
+                self._commands,
+                agent,
+                build_adapters(self._settings),
+            )
 
             loop = asyncio.get_running_loop()
             register_signal_handlers(loop, self._runner.stop)
@@ -89,6 +100,10 @@ class ApplicationRunner:
             self._cron.stop()
             return True
         finally:
+            if self._checkpoint is not None:
+                await self._checkpoint.__aexit__(None, None, None)
+                self._checkpoint = None
+            self._runner = None
             await self._registry.close()
             release_pid_file()
 

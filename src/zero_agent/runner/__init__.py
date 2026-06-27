@@ -1,6 +1,6 @@
 """Application runner: process lifecycle and message orchestration."""
 
-from zero_agent.runner.app import ApplicationRunner, run_application
+from zero_agent.runner.app import ApplicationRunner, run_application, wire_gate_runner
 from zero_agent.runner.dispatcher import MessageDispatcher
 from zero_agent.runner.lifecycle import (
     CronRunner,
@@ -23,4 +23,5 @@ __all__ = [
     "register_signal_handlers",
     "release_pid_file",
     "run_application",
+    "wire_gate_runner",
 ]
