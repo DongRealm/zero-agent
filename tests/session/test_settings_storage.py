@@ -30,3 +30,14 @@ def test_session_ttl_seconds_default() -> None:
 def test_session_ttl_seconds_override() -> None:
     settings = Settings(session_ttl_seconds=3600)
     assert settings.session_ttl_seconds == 3600
+
+
+def test_workspace_dir_default() -> None:
+    settings = Settings()
+    assert settings.workspace_dir == "."
+
+
+def test_workspace_dir_override() -> None:
+    settings = Settings(workspace_dir="/tmp/workspace")
+    assert settings.workspace_dir == "/tmp/workspace"
+

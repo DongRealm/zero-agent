@@ -17,6 +17,12 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = Field(default=SecretStr("sk-placeholder"), validation_alias="OPENAI_API_KEY")
     openai_model: str = Field(default="gpt-3.5-turbo", validation_alias="OPENAI_MODEL")
 
+    # Agent
+    workspace_dir: str = Field(
+        default=".",
+        description="Root directory for Deep Agents filesystem backend (Code Self-Inspection)",
+    )
+
     # Gateway
     wecom_bot_id: str | None = Field(default=None, validation_alias="WECOM_BOT_ID")
     wecom_bot_secret: SecretStr = Field(default=SecretStr(""), validation_alias="WECOM_BOT_SECRET")
