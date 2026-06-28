@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     )
 
     # Tavily
-    tavily_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="TAVILY_API_KEY")
+    tavily_api_key: SecretStr | None = Field(default=None, validation_alias="TAVILY_API_KEY")
 
     # Gateway
     wecom_bot_id: str | None = Field(default=None, validation_alias="WECOM_BOT_ID")

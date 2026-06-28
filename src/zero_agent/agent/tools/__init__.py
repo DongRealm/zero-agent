@@ -1,7 +1,16 @@
-from langchain.tools import BaseTool
+from __future__ import annotations
 
-from zero_agent.agent.tools.web_search import tavily_search
+from langchain_core.tools import BaseTool
+from langchain_tavily import TavilySearch
 
-__all__ = ["all_tools"]
+from zero_agent.settings import settings
 
-all_tools: list[BaseTool] = [tavily_search]
+__all__ = ["build_tools"]
+
+
+def build_tools() -> list[BaseTool]:
+    """Return tools"""
+    tools: list[BaseTool] = []
+    if settings.tavily_api_key:
+        tools.append(TavilySearch(tavily_api_key=settings.tavily_api_key.get_secret_value()))
+    return tools

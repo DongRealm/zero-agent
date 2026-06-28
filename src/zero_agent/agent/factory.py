@@ -8,13 +8,13 @@ from typing import Any
 from deepagents import create_deep_agent
 from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend, StoreBackend
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
 from zero_agent.agent.context import AgentContext
-from zero_agent.agent.tools import all_tools
 from zero_agent.settings import Settings
 
 _DEFAULT_SYSTEM_PROMPT = (
@@ -65,6 +65,7 @@ def build_agent_graph(
     store: BaseStore | None = None,
     model: BaseChatModel | None = None,
     system_prompt: str | None = None,
+    tools: list[BaseTool] | None = None,
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
     """Create a compiled Deep Agents graph with long-term memory and checkpointer."""
     llm = model or build_llm(settings)
@@ -86,5 +87,5 @@ def build_agent_graph(
         checkpointer=checkpointer,
         store=store,
         system_prompt=system_prompt or _DEFAULT_SYSTEM_PROMPT,
-        tools=all_tools,
+        tools=tools,
     )

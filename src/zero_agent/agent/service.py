@@ -14,6 +14,7 @@ from langgraph.store.base import BaseStore
 
 from zero_agent.agent.context import AgentContext
 from zero_agent.agent.factory import build_agent_graph
+from zero_agent.agent.tools import build_tools
 from zero_agent.agent.types import AgentError, AgentResult
 from zero_agent.observability.callbacks import AgentLoggingCallback
 from zero_agent.observability.context import bind_thread_id
@@ -38,11 +39,13 @@ class AgentService:
         store: BaseStore | None = None,
         model: BaseChatModel | None = None,
     ) -> AgentService:
+        tools = build_tools()
         graph = build_agent_graph(
             settings,
             checkpointer=checkpointer,
             store=store,
             model=model,
+            tools=tools,
         )
         return cls(graph)
 
