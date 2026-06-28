@@ -20,6 +20,7 @@ from zero_agent.runner.lifecycle import (
 )
 from zero_agent.session.checkpoint import CheckpointStore
 from zero_agent.session.registry import SessionRegistry
+from zero_agent.session.store import AgentStore
 from zero_agent.settings import Settings
 from zero_agent.settings import settings as default_settings
 
@@ -62,6 +63,7 @@ class ApplicationRunner:
         )
         self._runner: GateRunner | None = None
         self._checkpoint: CheckpointStore | None = None
+        self._store: AgentStore | None = None
 
     @property
     def runner(self) -> GateRunner:
@@ -76,10 +78,13 @@ class ApplicationRunner:
         await self._registry.open()
         self._checkpoint = CheckpointStore(self._settings.resolved_checkpoint_db_path)
         await self._checkpoint.__aenter__()
+        self._store = AgentStore(self._settings.resolved_store_db_path)
+        await self._store.__aenter__()
         try:
             agent = AgentService.from_settings(
                 self._settings,
                 checkpointer=self._checkpoint.saver,
+                store=self._store.store,
             )
             self._runner = wire_gate_runner(
                 self._registry,
@@ -101,6 +106,9 @@ class ApplicationRunner:
             self._cron.stop()
             return True
         finally:
+            if self._store is not None:
+                await self._store.__aexit__(None, None, None)
+                self._store = None
             if self._checkpoint is not None:
                 await self._checkpoint.__aexit__(None, None, None)
                 self._checkpoint = None

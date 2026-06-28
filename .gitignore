@@ -32,7 +32,8 @@ venv.bak/
 .env
 .env.local
 .env.*.local
-.local/
+.local/*
+!.local/skills/
 
 # Private ECS / local Docker deploy (keep on your machine only)
 deploy/

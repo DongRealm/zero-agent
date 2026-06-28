@@ -54,6 +54,7 @@ class MessageDispatcher:
 
             thread_id = await self._registry.resolve_thread_id(key)
             bind_thread_id(thread_id)
+            user_id = key.user_id or key.chat_id or key.to_id()
             use_stream = _supports_reply_stream(outbound)
             stream_id = thread_id
             stream_open = False
@@ -67,7 +68,7 @@ class MessageDispatcher:
             ok = True
             try:
                 try:
-                    result = await self._agent.invoke(thread_id, event.content)
+                    result = await self._agent.invoke(thread_id, event.content, user_id=user_id)
                     reply_content = result.content
                 except AgentError:
                     logger.exception("agent.invoke_failed", duration_ms=_duration_ms(started))

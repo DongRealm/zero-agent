@@ -1,6 +1,7 @@
 import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
 from pydantic import SecretStr
 
 from zero_agent.agent.factory import build_agent_graph, build_llm
@@ -45,6 +46,7 @@ def test_build_agent_graph_with_memory_saver(tmp_path) -> None:
     graph = build_agent_graph(
         settings,
         checkpointer=MemorySaver(),
+        store=InMemoryStore(),
         model=fake_model,
     )
 

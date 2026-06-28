@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
 from pydantic import SecretStr
 from tests.agent.helpers import ToolFakeChatModel
 
@@ -32,6 +33,7 @@ async def test_dispatcher_logs_session_and_thread_context(
         agent = AgentService.from_settings(
             settings,
             checkpointer=MemorySaver(),
+            store=InMemoryStore(),
             model=ToolFakeChatModel(responses=["logged-reply"]),
         )
         dispatcher = MessageDispatcher(

@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -24,6 +26,9 @@ class Settings(BaseSettings):
         description="Agent workspace root for Deep Agents filesystem backend (notes and personal files)",
     )
 
+    # Tavily
+    tavily_api_key: SecretStr | None = Field(default=None, validation_alias="TAVILY_API_KEY")
+
     # Gateway
     wecom_bot_id: str | None = Field(default=None, validation_alias="WECOM_BOT_ID")
     wecom_bot_secret: SecretStr = Field(default=SecretStr(""), validation_alias="WECOM_BOT_SECRET")
@@ -38,6 +43,11 @@ class Settings(BaseSettings):
         default=None,
         description="Path to LangGraph checkpoint database; defaults to {data_dir}/checkpoints.db",
     )
+    store_db_path: str | None = Field(
+        default=None,
+        description="Path to LangGraph store database for long-term memory; defaults to {data_dir}/store.db",
+    )
+
     default_locale: str = Field(default="zh", description="Default locale for new sessions")
     log_level: str = Field(default="INFO", description="Root log level (DEBUG, INFO, WARNING, ...)")
     log_json: bool = Field(default=True, description="Emit structured JSON logs to stderr")
@@ -62,6 +72,17 @@ class Settings(BaseSettings):
     def db_path(self) -> str:
         """Deprecated alias for resolved_session_db_path."""
         return self.resolved_session_db_path
+
+    @property
+    def resolved_store_db_path(self) -> str:
+        if self.store_db_path:
+            return self.store_db_path
+        return f"{self.data_dir}/store.db"
+
+    @property
+    def resolved_data_dir(self) -> str:
+        """Absolute path to the runtime data directory."""
+        return str(Path(self.data_dir).resolve())
 
 
 settings = Settings()

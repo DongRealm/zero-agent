@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from deepagents import create_deep_agent
-from deepagents.backends import FilesystemBackend
+from deepagents.backends import CompositeBackend, FilesystemBackend, StateBackend, StoreBackend
 from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.tools import BaseTool
 from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.base import BaseStore
 
+from zero_agent.agent.context import AgentContext
 from zero_agent.settings import Settings
 
 _DEFAULT_SYSTEM_PROMPT = (
@@ -30,19 +34,58 @@ def build_llm(settings: Settings) -> ChatOpenAI:
     return ChatOpenAI(**kwargs)
 
 
+def _memory_namespace(rt: object) -> tuple[str, ...]:
+    """Resolve the LangGraph Store namespace for long-term memory (``/memories/``).
+
+    ``StoreBackend`` calls this on each read/write. The returned tuple becomes
+    the store ``prefix`` (e.g. the WeCom ``user_id``), so each user gets an
+    isolated ``/memories/AGENTS.md`` under ``.local/store.db``.
+
+    Requires ``context_schema=AgentContext`` and ``context=AgentContext(user_id=...)``
+    on each invoke (see ``AgentService.invoke``).
+
+    Personal-only agent (single user, shared memory bucket):
+
+    Replace this function with a fixed namespace, e.g.
+    ``namespace=lambda rt: ("zero",)``, and remove ``context_schema`` /
+    ``AgentContext`` if nothing else needs runtime context. Migrate existing
+    store rows if the prefix changes (e.g. from a per-user id to ``"zero"``).
+    """
+    context = getattr(rt, "context", None)
+    user_id = getattr(context, "user_id", None)
+    if isinstance(user_id, str) and user_id:
+        return (user_id,)
+    return ("default",)
+
+
 def build_agent_graph(
     settings: Settings,
     *,
     checkpointer: BaseCheckpointSaver[Any] | None = None,
+    store: BaseStore | None = None,
     model: BaseChatModel | None = None,
     system_prompt: str | None = None,
+    tools: list[BaseTool] | None = None,
 ) -> CompiledStateGraph[Any, Any, Any, Any]:
-    """Create a compiled Deep Agents graph with filesystem backend and checkpointer."""
+    """Create a compiled Deep Agents graph with long-term memory and checkpointer."""
     llm = model or build_llm(settings)
-    backend = FilesystemBackend(root_dir=settings.workspace_dir, virtual_mode=False)
+    skills_root = f"{settings.resolved_data_dir}/skills"
+    Path(skills_root).mkdir(parents=True, exist_ok=True)
+    backend = CompositeBackend(
+        default=StateBackend(),
+        routes={
+            "/memories/": StoreBackend(store=store, namespace=_memory_namespace),
+            "/skills/": FilesystemBackend(root_dir=skills_root, virtual_mode=True),
+        },
+    )
     return create_deep_agent(
         model=llm,
+        memory=["/memories/AGENTS.md"],
+        skills=["/skills/"],
+        context_schema=AgentContext,
         backend=backend,
         checkpointer=checkpointer,
+        store=store,
         system_prompt=system_prompt or _DEFAULT_SYSTEM_PROMPT,
+        tools=tools,
     )

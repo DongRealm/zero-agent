@@ -2,6 +2,7 @@ import json
 
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
 from pydantic import SecretStr
 from tests.agent.helpers import ToolFakeChatModel
 
@@ -25,10 +26,11 @@ async def test_invoke_emits_llm_callback_logs(capsys: pytest.CaptureFixture[str]
     service = AgentService.from_settings(
         settings,
         checkpointer=MemorySaver(),
+        store=InMemoryStore(),
         model=ToolFakeChatModel(responses=["hello back"]),
     )
 
-    await service.invoke("thread-callback", "hello")
+    await service.invoke("thread-callback", "hello", user_id="user-1")
 
     events = [line["event"] for line in _parse_log_lines(capsys)]
     assert "llm.start" in events
@@ -47,13 +49,14 @@ def agent_service(tmp_path) -> AgentService:
     return AgentService.from_settings(
         settings,
         checkpointer=MemorySaver(),
+        store=InMemoryStore(),
         model=model,
     )
 
 
 @pytest.mark.asyncio
 async def test_invoke_returns_agent_result(agent_service: AgentService) -> None:
-    result = await agent_service.invoke("thread-1", "hello")
+    result = await agent_service.invoke("thread-1", "hello", user_id="user-1")
 
     assert isinstance(result, AgentResult)
     assert result.thread_id == "thread-1"
@@ -62,8 +65,8 @@ async def test_invoke_returns_agent_result(agent_service: AgentService) -> None:
 
 @pytest.mark.asyncio
 async def test_invoke_multi_turn_same_thread(agent_service: AgentService) -> None:
-    first = await agent_service.invoke("thread-1", "hello")
-    second = await agent_service.invoke("thread-1", "follow up")
+    first = await agent_service.invoke("thread-1", "hello", user_id="user-1")
+    second = await agent_service.invoke("thread-1", "follow up", user_id="user-1")
 
     assert first.content == "first-reply"
     assert second.content == "second-reply"
@@ -71,7 +74,7 @@ async def test_invoke_multi_turn_same_thread(agent_service: AgentService) -> Non
 
 @pytest.mark.asyncio
 async def test_invoke_returns_thread_id(agent_service: AgentService) -> None:
-    result = await agent_service.invoke("my-thread", "hello")
+    result = await agent_service.invoke("my-thread", "hello", user_id="user-1")
     assert result.thread_id == "my-thread"
 
 
@@ -86,10 +89,11 @@ async def test_invoke_wraps_graph_errors(tmp_path) -> None:
     service = AgentService.from_settings(
         settings,
         checkpointer=MemorySaver(),
+        store=InMemoryStore(),
         model=BrokenModel(responses=["x"]),
     )
 
     with pytest.raises(AgentError, match="boom") as exc_info:
-        await service.invoke("thread-x", "hello")
+        await service.invoke("thread-x", "hello", user_id="user-1")
 
     assert exc_info.value.thread_id == "thread-x"

@@ -30,6 +30,30 @@ def test_parse_wecom_session_id_direct_message() -> None:
     assert parse_wecom_session_id(frame) == "wecom:chat2"
 
 
+def test_parse_wecom_session_id_aibot_flat_frame() -> None:
+    frame = {
+        "chattype": "single",
+        "from": {"userid": "ZhangYiDong"},
+        "msgtype": "text",
+        "text": {"content": "hello"},
+    }
+    assert parse_wecom_session_id(frame) == "wecom:ZhangYiDong:ZhangYiDong"
+
+
+def test_message_event_from_aibot_flat_frame() -> None:
+    frame = {
+        "msgid": "msg-2",
+        "chattype": "single",
+        "from": {"userid": "ZhangYiDong"},
+        "text": {"content": "我喜欢甜食"},
+    }
+    event = message_event_from_frame(frame)
+
+    assert event.content == "我喜欢甜食"
+    assert event.session_id == "wecom:ZhangYiDong:ZhangYiDong"
+    assert event.push_target.chat_id == "ZhangYiDong"
+
+
 def test_parse_wecom_session_id_unknown() -> None:
     assert parse_wecom_session_id({}) == "wecom:unknown"
 
