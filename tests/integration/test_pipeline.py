@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.store.memory import InMemoryStore
 from pydantic import SecretStr
 from tests.agent.helpers import ToolFakeChatModel
 
@@ -43,6 +44,7 @@ async def test_wecom_message_to_agent_reply(pipeline_settings: Settings, tmp_pat
         agent = AgentService.from_settings(
             pipeline_settings,
             checkpointer=MemorySaver(),
+            store=InMemoryStore(),
             model=ToolFakeChatModel(responses=["pipeline-reply"]),
         )
         commands = CommandRouter(
@@ -106,6 +108,7 @@ async def test_wecom_reset_command_through_pipeline(
         agent = AgentService.from_settings(
             pipeline_settings,
             checkpointer=MemorySaver(),
+            store=InMemoryStore(),
             model=ToolFakeChatModel(responses=["unused"]),
         )
         commands = CommandRouter(
@@ -150,6 +153,7 @@ async def test_wecom_lang_command_through_pipeline(
         agent = AgentService.from_settings(
             pipeline_settings,
             checkpointer=MemorySaver(),
+            store=InMemoryStore(),
             model=ToolFakeChatModel(responses=["unused"]),
         )
         commands = CommandRouter(

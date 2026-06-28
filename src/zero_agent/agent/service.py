@@ -10,7 +10,9 @@ from langchain_core.messages import AIMessage, HumanMessage
 from langchain_core.runnables import RunnableConfig
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.store.base import BaseStore
 
+from zero_agent.agent.context import AgentContext
 from zero_agent.agent.factory import build_agent_graph
 from zero_agent.agent.types import AgentError, AgentResult
 from zero_agent.observability.callbacks import AgentLoggingCallback
@@ -33,16 +35,22 @@ class AgentService:
         settings: Settings,
         *,
         checkpointer: BaseCheckpointSaver[Any] | None = None,
+        store: BaseStore | None = None,
         model: BaseChatModel | None = None,
     ) -> AgentService:
-        graph = build_agent_graph(settings, checkpointer=checkpointer, model=model)
+        graph = build_agent_graph(
+            settings,
+            checkpointer=checkpointer,
+            store=store,
+            model=model,
+        )
         return cls(graph)
 
-    async def invoke(self, thread_id: str, message: str) -> AgentResult:
+    async def invoke(self, thread_id: str, message: str, *, user_id: str) -> AgentResult:
         """Run one user turn on the given LangGraph thread."""
         bind_thread_id(thread_id)
         started = time.monotonic()
-        logger.info("agent.invoke.start", content_len=len(message))
+        logger.info("agent.invoke.start", content_len=len(message), user_id=user_id)
         config: RunnableConfig = {
             "configurable": {"thread_id": thread_id},
             "callbacks": [AgentLoggingCallback()],
@@ -51,6 +59,7 @@ class AgentService:
             state = await self._graph.ainvoke(
                 {"messages": [HumanMessage(content=message)]},
                 config=config,
+                context=AgentContext(user_id=user_id),
             )
         except Exception as exc:
             logger.exception("agent.invoke.error", duration_ms=_duration_ms(started))

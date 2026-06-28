@@ -24,17 +24,39 @@ def parse_wecom_session_id(frame: dict[str, Any]) -> str:
 
 
 def wecom_session_key_from_frame(frame: dict[str, Any]) -> SessionKey:
-    body = frame.get("body") or {}
-    chat_id = _first_str(body, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
-    user_id = _first_str(body, "userid", "user_id") or _first_str(frame, "userid", "user_id")
+    data = _message_payload(frame)
+    user_id = _sender_user_id(data, frame) or None
+    chat_id = _first_str(data, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
+    if not chat_id and user_id:
+        chat_id = user_id
     return SessionKey(platform="wecom", chat_id=chat_id, user_id=user_id or None)
+
+
+def _message_payload(frame: dict[str, Any]) -> dict[str, Any]:
+    """Return the message fields, supporting both legacy ``body`` and flat SDK frames."""
+    body = frame.get("body")
+    if isinstance(body, dict) and body:
+        return body
+    return frame
+
+
+def _sender_user_id(data: dict[str, Any], frame: dict[str, Any]) -> str:
+    for container in (data, frame):
+        from_field = container.get("from")
+        if isinstance(from_field, dict):
+            user_id = from_field.get("userid") or from_field.get("user_id")
+            if isinstance(user_id, str) and user_id:
+                return user_id
+    return _first_str(data, "userid", "user_id") or _first_str(frame, "userid", "user_id")
 
 
 def parse_wecom_push_target(frame: dict[str, Any]) -> PushTarget:
     """Extract proactive push target from a WeCom callback frame."""
-    body = frame.get("body") or {}
-    chat_id = _first_str(body, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
-    chat_type = _first_int(body, "chattype", "chat_type")
+    data = _message_payload(frame)
+    chat_id = _first_str(data, "chatid", "chat_id") or _first_str(frame, "chatid", "chat_id")
+    if not chat_id:
+        chat_id = _sender_user_id(data, frame)
+    chat_type = _first_int(data, "chattype", "chat_type")
     if chat_type is None:
         chat_type = _first_int(frame, "chattype", "chat_type")
     return PushTarget(chat_id=chat_id, chat_type=chat_type)
@@ -42,8 +64,8 @@ def parse_wecom_push_target(frame: dict[str, Any]) -> PushTarget:
 
 def message_event_from_frame(frame: dict[str, Any]) -> MessageEvent:
     """Normalize a WeCom text callback frame into MessageEvent."""
-    body = frame.get("body") or {}
-    text = body.get("text", {})
+    data = _message_payload(frame)
+    text = data.get("text", {})
     content = text.get("content", "") if isinstance(text, dict) else ""
     if not isinstance(content, str):
         content = str(content)
