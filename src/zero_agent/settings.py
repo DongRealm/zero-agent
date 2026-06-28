@@ -24,6 +24,9 @@ class Settings(BaseSettings):
         description="Agent workspace root for Deep Agents filesystem backend (notes and personal files)",
     )
 
+    # Tavily
+    tavily_api_key: SecretStr = Field(default=SecretStr(""), validation_alias="TAVILY_API_KEY")
+
     # Gateway
     wecom_bot_id: str | None = Field(default=None, validation_alias="WECOM_BOT_ID")
     wecom_bot_secret: SecretStr = Field(default=SecretStr(""), validation_alias="WECOM_BOT_SECRET")

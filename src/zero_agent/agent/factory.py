@@ -11,6 +11,7 @@ from langchain_openai import ChatOpenAI
 from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 
+from zero_agent.agent.tools import all_tools
 from zero_agent.settings import Settings
 
 _DEFAULT_SYSTEM_PROMPT = (
@@ -45,4 +46,5 @@ def build_agent_graph(
         backend=backend,
         checkpointer=checkpointer,
         system_prompt=system_prompt or _DEFAULT_SYSTEM_PROMPT,
+        tools=all_tools,
     )
