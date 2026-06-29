@@ -14,7 +14,7 @@ from langgraph.checkpoint.base import BaseCheckpointSaver
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.store.base import BaseStore
 
-from zero_agent.agent.context import AgentContext
+from zero_agent.agent.tools import build_tools
 from zero_agent.settings import Settings
 
 _DEFAULT_SYSTEM_PROMPT = (
@@ -24,9 +24,12 @@ _DEFAULT_SYSTEM_PROMPT = (
 )
 
 
-def build_llm(settings: Settings) -> ChatOpenAI:
-    """Build the chat model from OpenAI-compatible settings."""
-    kwargs: dict[str, Any] = {"model": settings.openai_model}
+def build_llm(settings: Settings) -> BaseChatModel:
+    """Build the chat model from OpenAI-compatible settings with automatic retry."""
+    kwargs: dict[str, Any] = {
+        "model": settings.openai_model,
+        "max_retries": 3,
+    }
     if settings.openai_api_key is not None:
         kwargs["api_key"] = settings.openai_api_key.get_secret_value()
     if settings.openai_base_url:
@@ -34,28 +37,21 @@ def build_llm(settings: Settings) -> ChatOpenAI:
     return ChatOpenAI(**kwargs)
 
 
-def _memory_namespace(rt: object) -> tuple[str, ...]:
-    """Resolve the LangGraph Store namespace for long-term memory (``/memories/``).
-
-    ``StoreBackend`` calls this on each read/write. The returned tuple becomes
-    the store ``prefix`` (e.g. the WeCom ``user_id``), so each user gets an
-    isolated ``/memories/AGENTS.md`` under ``.local/store.db``.
-
-    Requires ``context_schema=AgentContext`` and ``context=AgentContext(user_id=...)``
-    on each invoke (see ``AgentService.invoke``).
-
-    Personal-only agent (single user, shared memory bucket):
-
-    Replace this function with a fixed namespace, e.g.
-    ``namespace=lambda rt: ("zero",)``, and remove ``context_schema`` /
-    ``AgentContext`` if nothing else needs runtime context. Migrate existing
-    store rows if the prefix changes (e.g. from a per-user id to ``"zero"``).
-    """
-    context = getattr(rt, "context", None)
-    user_id = getattr(context, "user_id", None)
-    if isinstance(user_id, str) and user_id:
-        return (user_id,)
+def _memory_namespace(_rt: object) -> tuple[str, ...]:
     return ("default",)
+
+
+def load_system_prompt(settings: Settings) -> str:
+    """Load system prompt from file if it exists, otherwise use default.
+
+    Looks for `{data_dir}/SOUL.md`. If the file exists and is non-empty, its content is used as the system prompt.
+    """
+    prompt_file = Path(settings.resolved_data_dir) / "SOUL.md"
+    if prompt_file.is_file():
+        content = prompt_file.read_text(encoding="utf-8").strip()
+        if content:
+            return content
+    return _DEFAULT_SYSTEM_PROMPT
 
 
 def build_agent_graph(
@@ -82,10 +78,9 @@ def build_agent_graph(
         model=llm,
         memory=["/memories/AGENTS.md"],
         skills=["/skills/"],
-        context_schema=AgentContext,
         backend=backend,
         checkpointer=checkpointer,
         store=store,
-        system_prompt=system_prompt or _DEFAULT_SYSTEM_PROMPT,
-        tools=tools,
+        system_prompt=system_prompt or load_system_prompt(settings),
+        tools=tools if tools is not None else build_tools(settings),
     )

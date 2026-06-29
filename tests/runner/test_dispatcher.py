@@ -104,7 +104,7 @@ async def test_dispatcher_agent_invoke_replies_via_outbound(
     await dispatcher.handle(event, outbound)
 
     thread_id = await registry.resolve_thread_id(session_key)
-    agent.invoke.assert_awaited_once_with(thread_id, "hello", user_id="user1")
+    agent.invoke.assert_awaited_once_with(thread_id, "hello")
     outbound.reply.assert_awaited_once_with(event, "agent-reply")
 
 
@@ -148,10 +148,7 @@ async def test_dispatcher_agent_error_uses_session_locale(
 
     await dispatcher.handle(event, outbound)
 
-    assert (
-        outbound.reply.await_args.args[1]
-        == "Something went wrong. Please retry or send /reset to start over."
-    )
+    assert outbound.reply.await_args.args[1] == "Something went wrong. Please retry or send /reset to start over."
 
 
 def _streaming_outbound() -> AsyncMock:
@@ -179,7 +176,7 @@ async def test_dispatcher_agent_uses_reply_stream_when_supported(
     await dispatcher.handle(event, outbound)
 
     thread_id = await registry.resolve_thread_id(session_key)
-    agent.invoke.assert_awaited_once_with(thread_id, "hello", user_id="user1")
+    agent.invoke.assert_awaited_once_with(thread_id, "hello")
     assert outbound.reply_stream.await_count == 2
     outbound.reply_stream.assert_any_await(event, thread_id, "处理中…", finish=False)
     outbound.reply_stream.assert_awaited_with(event, thread_id, "agent-reply", finish=True)

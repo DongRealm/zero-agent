@@ -30,7 +30,7 @@ async def test_invoke_emits_llm_callback_logs(capsys: pytest.CaptureFixture[str]
         model=ToolFakeChatModel(responses=["hello back"]),
     )
 
-    await service.invoke("thread-callback", "hello", user_id="user-1")
+    await service.invoke("thread-callback", "hello")
 
     events = [line["event"] for line in _parse_log_lines(capsys)]
     assert "llm.start" in events
@@ -56,7 +56,7 @@ def agent_service(tmp_path) -> AgentService:
 
 @pytest.mark.asyncio
 async def test_invoke_returns_agent_result(agent_service: AgentService) -> None:
-    result = await agent_service.invoke("thread-1", "hello", user_id="user-1")
+    result = await agent_service.invoke("thread-1", "hello")
 
     assert isinstance(result, AgentResult)
     assert result.thread_id == "thread-1"
@@ -65,8 +65,8 @@ async def test_invoke_returns_agent_result(agent_service: AgentService) -> None:
 
 @pytest.mark.asyncio
 async def test_invoke_multi_turn_same_thread(agent_service: AgentService) -> None:
-    first = await agent_service.invoke("thread-1", "hello", user_id="user-1")
-    second = await agent_service.invoke("thread-1", "follow up", user_id="user-1")
+    first = await agent_service.invoke("thread-1", "hello")
+    second = await agent_service.invoke("thread-1", "follow up")
 
     assert first.content == "first-reply"
     assert second.content == "second-reply"
@@ -74,7 +74,7 @@ async def test_invoke_multi_turn_same_thread(agent_service: AgentService) -> Non
 
 @pytest.mark.asyncio
 async def test_invoke_returns_thread_id(agent_service: AgentService) -> None:
-    result = await agent_service.invoke("my-thread", "hello", user_id="user-1")
+    result = await agent_service.invoke("my-thread", "hello")
     assert result.thread_id == "my-thread"
 
 
@@ -94,6 +94,48 @@ async def test_invoke_wraps_graph_errors(tmp_path) -> None:
     )
 
     with pytest.raises(AgentError, match="boom") as exc_info:
-        await service.invoke("thread-x", "hello", user_id="user-1")
+        await service.invoke("thread-x", "hello")
 
     assert exc_info.value.thread_id == "thread-x"
+
+
+@pytest.mark.asyncio
+async def test_invoke_timeout(tmp_path) -> None:
+    settings = Settings(openai_api_key=SecretStr("sk-test"), workspace_dir=str(tmp_path))
+
+    class SlowModel(ToolFakeChatModel):
+        def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            import time
+
+            time.sleep(0.5)
+            return super()._generate(messages, stop, run_manager, **kwargs)
+
+    service = AgentService.from_settings(
+        settings,
+        checkpointer=MemorySaver(),
+        store=InMemoryStore(),
+        model=SlowModel(responses=["late"]),
+    )
+
+    with pytest.raises(AgentError, match="timed out"):
+        await service.invoke("thread-timeout", "hello", timeout=0.001)
+
+
+@pytest.mark.asyncio
+async def test_from_settings_accepts_custom_tools(tmp_path) -> None:
+    from langchain_core.tools import tool
+
+    @tool
+    def dummp_tool(query: str) -> str:
+        return f"result: {query}"
+
+    settings = Settings(openai_api_key=SecretStr("sk-test"), workspace_dir=str(tmp_path))
+    service = AgentService.from_settings(
+        settings,
+        checkpointer=MemorySaver(),
+        store=InMemoryStore(),
+        model=ToolFakeChatModel(responses=["ok"]),
+        tools=[dummp_tool],
+    )
+    result = await service.invoke("thread-tools", "test")
+    assert result.content == "ok"
